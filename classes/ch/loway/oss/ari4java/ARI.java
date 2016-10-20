@@ -45,6 +45,7 @@ public class ARI {
     private final static String ALLOWED_IN_UID = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
         
     private String appName = "";
+    private String url = "";
     private AriVersion version;
     private HttpClient httpClient;
     private WsClient wsClient;
@@ -64,6 +65,9 @@ public class ARI {
         this.version = version;
     }
     
+    public void setUrl(String url) {
+    	this.url = url;
+    }
     
     /**
      * Returns the current ARI version.
@@ -76,6 +80,14 @@ public class ARI {
         return version;
     }
     
+    /**
+     * Returns the server and port the websocket is connected to.
+     * 
+   	 * @return the server currently being used.
+   	 */
+   	public String getUrl() {
+   		return url;
+   	}
 
     /**
      * Get the implementation for a given action interface
@@ -86,6 +98,11 @@ public class ARI {
      */
     @SuppressWarnings("unchecked")
     public <T> T getActionImpl(Class<T> klazz) throws ARIException {
+
+        // use the events method as we ref it for cleanup
+        if (klazz == ActionEvents.class) {
+            return (T) events();
+        }
 
         BaseAriAction action = (BaseAriAction) buildConcreteImplementation(klazz);
         action.setHttpClient(this.httpClient);
@@ -196,6 +213,7 @@ public class ARI {
                 ari.setHttpClient(hc);
                 ari.setWsClient(hc);
                 ari.setVersion( version );
+                ari.setUrl(url);
 
                 return ari;
 
@@ -350,11 +368,18 @@ public class ARI {
     public void cleanup() throws ARIException {
 
         if ( liveActionEvent != null ) {
-            closeAction( liveActionEvent );
+            try {
+                closeAction(liveActionEvent);
+            } catch (ARIException e) {
+                // ignore on cleanup...
+            }
+            liveActionEvent = null;
         }
 
         destroy( wsClient );
-        destroy( httpClient );
+        if (wsClient != httpClient) {
+            destroy(httpClient);
+        }
 
         wsClient = null;
         httpClient = null;
@@ -397,8 +422,7 @@ public class ARI {
 
         final MessageQueue q = new MessageQueue();
 
-        ActionEvents ae = events();
-        ae.eventWebsocket( appName, new AriCallback<Message>() {
+        events().eventWebsocket( appName, new AriCallback<Message>() {
 
             @Override
             public void onSuccess(Message result) {                
@@ -411,8 +435,6 @@ public class ARI {
             }
         });
 
-        // register the AE so we can disconnectWs it when the erorr goes down
-        liveActionEvent = ae;
         return q;
 
     }
@@ -479,7 +501,9 @@ public class ARI {
      * @return an Events object.
      */
     public ActionEvents events() {
-        return (ActionEvents) setupAction(version.builder().actionEvents());
+        if (liveActionEvent == null)
+            liveActionEvent = (ActionEvents) setupAction(version.builder().actionEvents());
+        return liveActionEvent;
     }
 
     /**

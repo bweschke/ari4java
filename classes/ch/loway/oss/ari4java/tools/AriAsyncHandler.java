@@ -12,6 +12,7 @@ public class AriAsyncHandler<T> implements HttpResponseHandler {
     private final AriCallback<? super T> callback;
     private Class<T> klazz;
     private TypeReference<T> klazzType;
+    private long lastResponseTime = 0;
 
     public AriAsyncHandler(AriCallback<? super T> callback, Class<T> klazz) {
         this.callback = callback;
@@ -45,12 +46,18 @@ public class AriAsyncHandler<T> implements HttpResponseHandler {
 
     @Override
     public void onChReadyToWrite() {
-        // Client connected. That's good.
+        lastResponseTime = System.currentTimeMillis();
     }
 
     @Override
     public void onResponseReceived() {
-        //this.callback.onFailure(new RestException("Asterisk WS is disconnected. Please retry."));
+        lastResponseTime = System.currentTimeMillis();
+    }
+
+    @Override
+    public void onDisconnect() {
+        // this is from channelInactive on the websocket raise an error so the client can reconnect if need be
+        this.callback.onFailure(new RestException("Asterisk WS is disconnected. Please retry."));
     }
 
     @Override
@@ -61,6 +68,11 @@ public class AriAsyncHandler<T> implements HttpResponseHandler {
     @Override
     public void onFailure(Throwable e) {
         this.callback.onFailure(new RestException(e));
+    }
+
+    @Override
+    public long getLastResponseTime() {
+        return lastResponseTime;
     }
 
 }

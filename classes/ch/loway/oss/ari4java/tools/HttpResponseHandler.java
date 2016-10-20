@@ -18,6 +18,11 @@ public interface HttpResponseHandler {
     void onResponseReceived();
 
     /**
+     * WebSocket disconnected
+     */
+    void onDisconnect();
+
+    /**
      * All went well.
      *
      * @param response
@@ -30,4 +35,11 @@ public interface HttpResponseHandler {
      * @param e
      */
     void onFailure(Throwable e);
+
+    /**
+     * The last time in epoch since last response
+     *
+     * @return epoch
+     */
+    long getLastResponseTime();
 }
